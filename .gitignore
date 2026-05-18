@@ -1,0 +1,36 @@
+# Godot 4+ specific ignores
+godot-project/.godot/
+godot-project/.import/
+godot-project/export.cfg
+godot-project/export_presets.cfg
+
+# Imported translations (automatically generated from CSV files)
+*.translation
+
+# Mono-specific ignores
+godot-project/.mono/
+godot-project/data_*/
+
+# System / build artifacts
+builds/
+*.apk
+*.aab
+*.keystore
+*.jks
+*.pkcs12
+
+# Android export presets / signing config — never commit secrets
+android-export/keystore.cfg
+android-export/*.keystore
+android-export/*.jks
+
+# OS noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.iml
