@@ -38,13 +38,25 @@ func _apply_offline_earnings(saved_at_unix: int) -> void:
 	var away := maxi(0, now - saved_at_unix)
 	if away <= 0:
 		return
+	var avg_mult := _average_dish_price_mult(GameState.current_city_id)
 	var earned := Economy.calculate_offline_earnings(
 		away,
 		GameState.upgrade_levels["price"],
 		GameState.upgrade_levels["queue_size"],
 		GameState.upgrade_levels["cook_speed"],
 		GameState.upgrade_levels["auto_cook"],
+		GameState.prestige_count,
+		avg_mult,
 	)
 	if earned > 0.0:
 		GameState.add_cash(earned)
 		offline_earnings_awarded.emit(earned, away)
+
+func _average_dish_price_mult(city_id: String) -> float:
+	var city := MenuData.get_city(city_id)
+	if city.menu.is_empty():
+		return 1.0
+	var total := 0.0
+	for dish_id in city.menu:
+		total += MenuData.get_dish(dish_id).price_mult
+	return total / float(city.menu.size())

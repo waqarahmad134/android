@@ -36,13 +36,14 @@ func upgrade_cost(upgrade_id: String, current_level: int) -> float:
 	var def: Dictionary = UPGRADE_DEFINITIONS[upgrade_id]
 	return def.base_cost * pow(def.cost_growth, current_level)
 
-func cook_time(cook_speed_level: int) -> float:
+func cook_time(cook_speed_level: int, dish_cook_mult: float = 1.0) -> float:
 	var speed_mult := 1.0 + cook_speed_level * UPGRADE_DEFINITIONS["cook_speed"].value_per_level
-	return BASE_COOK_TIME_SECONDS / speed_mult
+	return (BASE_COOK_TIME_SECONDS * dish_cook_mult) / speed_mult
 
-func dish_price(price_level: int) -> float:
+func dish_price(price_level: int, dish_price_mult: float = 1.0, prestige_count: int = 0) -> float:
 	var price_mult := 1.0 + price_level * UPGRADE_DEFINITIONS["price"].value_per_level
-	return BASE_DISH_PRICE * price_mult
+	var prestige_mult := MenuData.prestige_multiplier(prestige_count)
+	return BASE_DISH_PRICE * dish_price_mult * price_mult * prestige_mult
 
 func queue_capacity(queue_level: int) -> int:
 	return int(UPGRADE_DEFINITIONS["queue_size"].base_value) + queue_level
@@ -50,10 +51,10 @@ func queue_capacity(queue_level: int) -> int:
 func auto_cook_rate(auto_level: int) -> float:
 	return auto_level * UPGRADE_DEFINITIONS["auto_cook"].value_per_level
 
-func calculate_offline_earnings(seconds_away: int, price_level: int, queue_level: int, cook_speed_level: int, auto_level: int) -> float:
+func calculate_offline_earnings(seconds_away: int, price_level: int, _queue_level: int, _cook_speed_level: int, auto_level: int, prestige_count: int = 0, avg_dish_price_mult: float = 1.0) -> float:
 	if auto_level <= 0:
 		return 0.0
 	var clamped := mini(seconds_away, OFFLINE_EARNINGS_CAP_SECONDS)
 	var dishes_per_second := auto_cook_rate(auto_level)
 	var dishes := dishes_per_second * float(clamped)
-	return dishes * dish_price(price_level)
+	return dishes * dish_price(price_level, avg_dish_price_mult, prestige_count)
