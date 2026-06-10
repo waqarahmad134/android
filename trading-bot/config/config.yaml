@@ -44,8 +44,26 @@ poll_interval_seconds: 300
 # -----------------------------------------------------------------------------
 # Strategy selection. One of: ema_crossover, rsi_mean_reversion, momentum, ensemble
 # "ensemble" combines the others and only acts on majority agreement.
+# This `strategy` is the default/fallback; fine-grained control is below.
 # -----------------------------------------------------------------------------
 strategy: ensemble
+
+# Multi-strategy control — pick how a strategy is chosen per coin:
+#   single  : use `default` for every coin.
+#   routing : use the explicit map below (set it by hand, or generate it with
+#             `python -m src.main evaluate` and "Apply recommendation" in the UI).
+#   auto    : adaptive — pick the best live performer per coin once enough trades
+#             exist, else the backtest recommendation, else `default`.
+strategy_selection:
+  mode: single             # single | routing | auto
+  default: ensemble
+  routing:                 # used when mode: routing
+    default: ensemble
+    # BTC/USDT: ema_crossover
+    # PAXG/USDT: rsi_mean_reversion
+  auto:                    # used when mode: auto
+    min_trades: 5          # live trades before trusting a strategy for a coin
+    metric: total_pnl      # total_pnl | win_rate | avg_pnl
 
 strategy_params:
   ema_crossover:

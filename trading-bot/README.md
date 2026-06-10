@@ -47,19 +47,54 @@ trading-bot/
   src/
     exchanges/      # Unified adapter over Binance / KuCoin / Bybit (ccxt-based)
     strategies/     # Pluggable signal generators (EMA, RSI mean-reversion, momentum, ensemble)
+    strategies/     # + router.py (per-coin selection) + performance.py (live stats)
     risk/           # Position sizing, stop-loss / take-profit, daily circuit breaker
     portfolio/      # Equity tracking + compounding engine
     notify/         # Slack alerts (incoming webhook, stdlib only)
+    web/            # Flask dashboard + admin settings (charts, config/keys editor)
     data/           # OHLCV fetch + technical indicators
     utils/          # Logging, config loading
-    engine.py       # Main trading loop (paper or live)
+    configio.py     # Read/write config.yaml + .env for the settings page
+    state.py        # Atomic JSON snapshot shared bot -> dashboard
+    engine.py       # Main trading loop (paper or live) + config hot-reload
     backtest.py     # Historical simulator
+    evaluate.py     # Rank every strategy on every coin -> recommended routing
     main.py         # CLI entry point
   config/config.yaml
   Dockerfile        # 24/7 container image
   docker-compose.yml
   tests/
 ```
+
+## Strategies & indicators
+
+**Indicators:** EMA (12/26), RSI (14, Wilder), ATR (14), ROC/Momentum.
+
+| Strategy | Indicators | Best in |
+|---|---|---|
+| `ema_crossover` | EMA 12/26 | Trends |
+| `rsi_mean_reversion` | RSI 14 | Ranges |
+| `momentum` | ROC | Breakouts |
+| `ensemble` | all three (majority vote) | Mixed — combines their strengths |
+
+**Multi-strategy selection** (`strategy_selection.mode`): `single`, `routing`
+(per-coin map), or `auto` (adaptive — picks the best live performer per coin,
+falling back to backtest recommendations). Run `python -m src.main evaluate` to
+rank every strategy on every coin and generate a recommended routing map, then
+apply it from the dashboard. See `docs/STRATEGY.md`.
+
+## Web dashboard & admin
+
+```bash
+python -m src.main dashboard      # http://localhost:8000  (or the compose service)
+```
+
+- **Dashboard:** equity curve, drawdown, PnL & win-rate **by strategy**,
+  per-coin active-vs-recommended table, open positions, recent trades. Read-only.
+- **Settings (`/settings`):** edit **every** config value and **all API keys**
+  from the browser. Writes are gated behind `ADMIN_TOKEN` (set it in `.env`);
+  with it unset the UI is read-only. Risk/strategy/universe edits **hot-reload**
+  into the running bot; exchange keys/mode need a restart.
 
 ## Quick start
 

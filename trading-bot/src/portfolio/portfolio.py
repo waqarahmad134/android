@@ -17,6 +17,7 @@ class Position:
     stop_loss: float
     take_profit: float
     peak_price: float = 0.0
+    strategy: str = ""        # which strategy opened this position
 
     def __post_init__(self):
         if self.peak_price == 0.0:
@@ -64,11 +65,11 @@ class Portfolio:
         return sum(p.market_value(prices.get(s, p.entry_price)) for s, p in self.positions.items())
 
     def open_position(self, symbol: str, amount: float, price: float, cost: float,
-                      stop_loss: float, take_profit: float) -> None:
+                      stop_loss: float, take_profit: float, strategy: str = "") -> None:
         self.cash -= cost
         self.positions[symbol] = Position(
             symbol=symbol, amount=amount, entry_price=price,
-            stop_loss=stop_loss, take_profit=take_profit,
+            stop_loss=stop_loss, take_profit=take_profit, strategy=strategy,
         )
         log.info("Opened %s: %.8f @ %.4f (cost %.2f)", symbol, amount, price, cost)
 
@@ -91,6 +92,7 @@ class Portfolio:
             "exit_price": price,
             "amount": pos.amount,
             "pnl": pnl,
+            "strategy": pos.strategy,
             "closed_at": time.time(),
         })
         # Keep only the most recent trades in memory for the dashboard.

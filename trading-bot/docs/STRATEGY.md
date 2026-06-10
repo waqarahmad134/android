@@ -65,6 +65,48 @@ deployed. A strategy that loses in backtest will lose live. Backtests also
 overstate results (no slippage spikes, no outages, survivorship), so treat live
 paper results as the real test.
 
+## Multi-strategy: routing, auto-selection, and "training"
+
+You don't have to commit to one strategy. The system attributes every closed
+trade to the strategy that opened it, so it can learn which indicator suits
+which coin. Three selection modes (`strategy_selection.mode` in config):
+
+- **single** — one strategy for everything (simplest; back-compatible).
+- **routing** — an explicit `{symbol → strategy}` map you control. Set it by
+  hand, or generate it automatically (below) and apply it in the dashboard.
+- **auto** — adaptive. For each coin it uses the strategy with the best *live*
+  track record once enough trades exist (`auto.min_trades`), otherwise the
+  backtest recommendation, otherwise the default. This is the "switch if one
+  isn't performing, finalize the winner on results" behaviour.
+
+### The training / finalization workflow
+
+```bash
+# Backtest EVERY strategy on EVERY coin and rank them:
+python -m src.main evaluate --days 180 --metric total_return_pct
+```
+
+This prints a per-coin scoreboard and writes `logs/evaluation.json` with a
+recommended strategy per coin, e.g.:
+
+```
+BTC/USDT:   ema_crossover  <-- recommended   (trends cleanly)
+PAXG/USDT:  rsi_mean_reversion <-- recommended (ranges around gold price)
+ETH/USDT:   momentum       <-- recommended
+```
+
+The dashboard shows this as a **"best strategy per coin"** table, and the
+Settings page has **Apply backtest recommendation** to switch routing to those
+winners in one click. In `auto` mode the live bot then keeps refining per-coin
+choices from real trade results.
+
+### Combining strengths
+
+The `ensemble` strategy already does "use each indicator's powers together": it
+runs EMA + RSI + Momentum and only acts when a majority agree. Use it as a coin's
+strategy when no single indicator dominates — it trades less but with higher
+conviction.
+
 ## Tuning checklist
 
 1. Backtest across **multiple symbols and multiple time windows** (bull, bear,

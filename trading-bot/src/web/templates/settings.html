@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading Bot · Settings</title>
+<style>
+  :root{--bg:#0b1220;--panel:#131c2e;--panel2:#0f1726;--line:#243049;
+        --txt:#e6edf7;--muted:#8aa0c0;--green:#27d796;--red:#ff5d6c;--accent:#4f8cff}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt)}
+  header{display:flex;align-items:center;justify-content:space-between;
+         padding:16px 24px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .brand{font-weight:600;font-size:18px}
+  a{color:var(--accent);text-decoration:none;font-weight:600}
+  main{padding:24px;max-width:1000px;margin:0 auto}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+         padding:20px;margin-bottom:20px}
+  .panel h3{margin:0 0 6px;font-size:16px}
+  .panel p.hint{margin:0 0 16px;color:var(--muted);font-size:13px}
+  .group{margin-bottom:18px}
+  .group h4{margin:0 0 10px;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:.05em}
+  .row{display:grid;grid-template-columns:1fr 1.4fr;gap:12px;align-items:center;
+       padding:7px 0;border-bottom:1px solid var(--line)}
+  .row label{color:var(--muted);font-size:13px;font-family:monospace;word-break:break-all}
+  input,select{width:100%;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);
+        border-radius:8px;color:var(--txt);font-size:13px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .btn{padding:9px 16px;border:none;border-radius:9px;background:var(--accent);color:#fff;
+       font-weight:600;cursor:pointer;font-size:14px}
+  .btn.secondary{background:var(--panel2);border:1px solid var(--line);color:var(--txt)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .bar{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .msg{font-size:13px;margin-left:auto}
+  .ok{color:var(--green)} .err{color:var(--red)}
+  .token{display:flex;gap:10px;align-items:center}
+  .keypreview{font-family:monospace;color:var(--muted);font-size:12px}
+  .warn{background:rgba(244,200,74,.12);border:1px solid rgba(244,200,74,.4);
+        color:#f4c84a;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:18px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">⚙ Settings &amp; Admin</div>
+  <a href="/">← Back to dashboard</a>
+</header>
+
+<main>
+  <div id="adminWarn" class="warn" style="display:none">
+    Admin writes are <b>disabled</b>. Set <code>ADMIN_TOKEN</code> in <code>.env</code>
+    (or via the keys section after enabling) to edit settings.
+  </div>
+
+  <div class="panel">
+    <h3>Admin token</h3>
+    <p class="hint">Required to save changes. Stored only in this browser. Matches the
+      <code>ADMIN_TOKEN</code> environment variable on the server.</p>
+    <div class="token">
+      <input type="password" id="token" placeholder="admin token">
+      <button class="btn secondary" onclick="saveToken()">Remember</button>
+      <span id="tokenMsg" class="keypreview"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Configuration values</h3>
+    <p class="hint">Every key from <code>config.yaml</code>. Risk, strategy and universe
+      changes apply live (hot-reload); <code>mode</code>/<code>exchange</code> need a bot restart.</p>
+    <div id="configForm"></div>
+    <div class="bar">
+      <button class="btn" id="saveConfig" onclick="saveConfig()">Save configuration</button>
+      <button class="btn secondary" onclick="applyRecommendation()"
+        title="Set per-coin routing to the latest backtest winners">Apply backtest recommendation</button>
+      <span id="cfgMsg" class="msg"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>API keys &amp; secrets</h3>
+    <p class="hint">Stored in <code>.env</code> (never shown in full, never committed).
+      Leave a field blank to keep the current value. Use <b>trade-only</b> keys —
+      never enable withdrawals.</p>
+    <div id="keysForm"></div>
+    <div class="bar">
+      <button class="btn" id="saveKeys" onclick="saveKeys()">Save keys</button>
+      <span id="keyMsg" class="msg"></span>
+    </div>
+  </div>
+</main>
+
+<script>
+const KEY_FIELDS = [
+  "BINANCE_API_KEY","BINANCE_API_SECRET",
+  "KUCOIN_API_KEY","KUCOIN_API_SECRET","KUCOIN_API_PASSWORD",
+  "BYBIT_API_KEY","BYBIT_API_SECRET","SLACK_WEBHOOK_URL","ADMIN_TOKEN"
+];
+let TOKEN = localStorage.getItem('adminToken')||'';
+
+function saveToken(){
+  TOKEN = document.getElementById('token').value.trim();
+  localStorage.setItem('adminToken', TOKEN);
+  document.getElementById('tokenMsg').textContent = TOKEN ? 'saved in this browser' : 'cleared';
+}
+function hdrs(){ return {'Content-Type':'application/json','X-Admin-Token':TOKEN}; }
+
+// Flatten nested config into dotted leaves so EVERY value is editable.
+function flatten(obj, prefix='', out={}){
+  for(const k in obj){
+    const path = prefix ? prefix+'.'+k : k;
+    const v = obj[k];
+    if(v && typeof v==='object' && !Array.isArray(v)) flatten(v, path, out);
+    else out[path] = Array.isArray(v) ? v.join(', ') : v;
+  }
+  return out;
+}
+
+let FLAT = {};
+async function loadConfig(){
+  const r = await (await fetch('/api/config')).json();
+  document.getElementById('adminWarn').style.display = r.admin_enabled ? 'none':'block';
+  FLAT = flatten(r.config);
+
+  // Group fields by their top-level section for readability.
+  const groups = {};
+  for(const path in FLAT){
+    const sec = path.split('.')[0];
+    (groups[sec] = groups[sec]||[]).push(path);
+  }
+  const form = document.getElementById('configForm'); form.innerHTML='';
+  for(const sec in groups){
+    const g = document.createElement('div'); g.className='group';
+    g.innerHTML = `<h4>${sec}</h4>`;
+    for(const path of groups[sec]){
+      const val = FLAT[path];
+      const isBool = typeof val==='boolean';
+      const field = isBool
+        ? `<select data-path="${path}">
+             <option value="true" ${val? 'selected':''}>true</option>
+             <option value="false" ${!val?'selected':''}>false</option></select>`
+        : `<input data-path="${path}" value="${val==null?'':String(val).replace(/"/g,'&quot;')}">`;
+      g.insertAdjacentHTML('beforeend',
+        `<div class="row"><label>${path}</label><div>${field}</div></div>`);
+    }
+    form.appendChild(g);
+  }
+
+  // keys
+  const kf = document.getElementById('keysForm'); kf.innerHTML='';
+  for(const k of KEY_FIELDS){
+    const st = (r.keys&&r.keys[k])||{set:false,preview:''};
+    kf.insertAdjacentHTML('beforeend',
+      `<div class="row"><label>${k} <span class="keypreview">${st.set?('· '+st.preview):'· not set'}</span></label>
+       <div><input type="password" data-key="${k}" placeholder="${st.set?'•••• (keep)':'not set'}"></div></div>`);
+  }
+}
+
+function collectChanged(){
+  const updates = {};
+  document.querySelectorAll('[data-path]').forEach(el=>{
+    const path = el.getAttribute('data-path');
+    let v = el.value;
+    if(String(v) !== String(FLAT[path] ?? '')) updates[path] = v;
+  });
+  return updates;
+}
+
+async function saveConfig(){
+  const msg = document.getElementById('cfgMsg');
+  const updates = collectChanged();
+  if(!Object.keys(updates).length){ msg.className='msg'; msg.textContent='No changes.'; return; }
+  try{
+    const res = await fetch('/api/config',{method:'POST',headers:hdrs(),body:JSON.stringify(updates)});
+    if(!res.ok) throw new Error((await res.text()));
+    msg.className='msg ok'; msg.textContent='Saved '+Object.keys(updates).length+' value(s). Applies on next loop.';
+    loadConfig();
+  }catch(e){ msg.className='msg err'; msg.textContent='Error: '+e.message; }
+}
+
+async function saveKeys(){
+  const msg = document.getElementById('keyMsg');
+  const updates = {};
+  document.querySelectorAll('[data-key]').forEach(el=>{ if(el.value!=='') updates[el.getAttribute('data-key')] = el.value; });
+  if(!Object.keys(updates).length){ msg.className='msg'; msg.textContent='No keys entered.'; return; }
+  try{
+    const res = await fetch('/api/keys',{method:'POST',headers:hdrs(),body:JSON.stringify(updates)});
+    if(!res.ok) throw new Error(await res.text());
+    msg.className='msg ok'; msg.textContent='Keys saved. Restart the bot to use new exchange keys.';
+    loadConfig();
+  }catch(e){ msg.className='msg err'; msg.textContent='Error: '+e.message; }
+}
+
+async function applyRecommendation(){
+  const msg = document.getElementById('cfgMsg');
+  try{
+    const res = await fetch('/api/apply-recommendation',{method:'POST',headers:hdrs()});
+    if(!res.ok) throw new Error(await res.text());
+    const d = await res.json();
+    msg.className='msg ok'; msg.textContent='Applied routing for '+Object.keys(d.applied).length+' coin(s).';
+    loadConfig();
+  }catch(e){ msg.className='msg err'; msg.textContent='Error: '+e.message; }
+}
+
+document.getElementById('token').value = TOKEN;
+loadConfig();
+</script>
+</body>
+</html>
