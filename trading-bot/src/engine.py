@@ -12,6 +12,7 @@ from .exchanges import ExchangeAdapter
 from .notify import Notifier, NullNotifier
 from .portfolio import Portfolio
 from .risk import RiskManager
+from .state import write_state
 from .strategies import Strategy
 from .strategies.base import Action
 from .utils import Config
@@ -38,10 +39,46 @@ class TradingEngine:
             compounding_enabled=bool(comp.get("enabled", True)),
         )
         self._day_index: int | None = None
+        self._equity_curve: list[dict] = []  # rolling (time, equity) for the dashboard
 
     # --- helpers ---
     def _prices(self) -> dict[str, float]:
         return {s: self.exchange.fetch_price(s) for s in self.cfg.universe}
+
+    def _write_snapshot(self, prices: dict[str, float], equity: float) -> None:
+        """Persist current state for the web dashboard (read-only viewer)."""
+        self._equity_curve.append({"t": time.time(), "equity": round(equity, 2)})
+        if len(self._equity_curve) > 1000:
+            self._equity_curve = self._equity_curve[-1000:]
+
+        positions = [
+            {
+                "symbol": s,
+                "amount": p.amount,
+                "entry_price": p.entry_price,
+                "price": prices.get(s, p.entry_price),
+                "stop_loss": p.stop_loss,
+                "take_profit": p.take_profit,
+                "unrealized_pnl": p.unrealized_pnl(prices.get(s, p.entry_price)),
+            }
+            for s, p in self.portfolio.positions.items()
+        ]
+        try:
+            write_state({
+                "mode": self.cfg.mode,
+                "exchange": self.cfg.exchange,
+                "strategy": self.strategy.name,
+                "quote_currency": self.cfg.quote_currency,
+                "equity": round(equity, 2),
+                "reserve": round(self.portfolio.reserve, 2),
+                "realized_pnl": round(self.portfolio.realized_pnl, 2),
+                "halted": self.risk.halted,
+                "positions": positions,
+                "closed_trades": self.portfolio.closed_trades[-50:],
+                "equity_curve": self._equity_curve,
+            })
+        except Exception as exc:  # dashboard I/O must never break trading
+            log.warning("Failed to write dashboard state: %s", exc)
 
     def _roll_day_if_needed(self, equity: float) -> None:
         day = int(time.time() // 86400)
@@ -147,6 +184,7 @@ class TradingEngine:
                     equity, self.portfolio.reserve,
                     len(self.portfolio.positions), self.portfolio.realized_pnl,
                 )
+                self._write_snapshot(prices, equity)
             except KeyboardInterrupt:
                 log.info("Interrupted — shutting down.")
                 break

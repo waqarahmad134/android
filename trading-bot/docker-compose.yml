@@ -21,3 +21,17 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+  # Read-only web dashboard — open http://localhost:8000
+  dashboard:
+    build: .
+    image: multi-exchange-trading-bot:latest
+    container_name: trading-bot-dashboard
+    restart: unless-stopped
+    command: ["dashboard", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs:ro       # only reads the state file the bot writes
+    depends_on:
+      - trading-bot

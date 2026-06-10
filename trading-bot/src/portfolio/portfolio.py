@@ -1,6 +1,7 @@
 """Tracks open positions, realized PnL, equity, and compounding behaviour."""
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 
 from ..utils.logger import get_logger
@@ -48,6 +49,7 @@ class Portfolio:
     reserve: float = 0.0                  # locked-in profit, not traded
     profit_reserve_pct: float = 0.0
     compounding_enabled: bool = True
+    closed_trades: list[dict] = field(default_factory=list)  # for the dashboard
 
     def equity(self, prices: dict[str, float]) -> float:
         """Tradable equity = cash + market value of open positions."""
@@ -82,6 +84,18 @@ class Portfolio:
             self.cash -= skim
             self.reserve += skim
             log.info("Reserved %.2f of profit (locked total %.2f)", skim, self.reserve)
+
+        self.closed_trades.append({
+            "symbol": symbol,
+            "entry_price": pos.entry_price,
+            "exit_price": price,
+            "amount": pos.amount,
+            "pnl": pnl,
+            "closed_at": time.time(),
+        })
+        # Keep only the most recent trades in memory for the dashboard.
+        if len(self.closed_trades) > 200:
+            self.closed_trades = self.closed_trades[-200:]
 
         log.info("Closed %s @ %.4f -> PnL %.2f", symbol, price, pnl)
         return pnl

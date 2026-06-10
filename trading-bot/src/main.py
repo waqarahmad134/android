@@ -78,6 +78,13 @@ def cmd_balance(args):
     print(f"{cfg.quote_currency}: free={bal.free:.2f} used={bal.used:.2f} total={bal.total:.2f}")
 
 
+def cmd_dashboard(args):
+    _setup(args)
+    from .web.app import run as run_web
+    log.info("Starting dashboard on http://%s:%d", args.host, args.port)
+    run_web(host=args.host, port=args.port)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Multi-exchange, risk-first trading bot")
     p.add_argument("--config", default="config/config.yaml", help="path to config YAML")
@@ -93,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
     bt.set_defaults(func=cmd_backtest)
 
     sub.add_parser("balance", help="show account balance").set_defaults(func=cmd_balance)
+
+    dash = sub.add_parser("dashboard", help="run the read-only web dashboard")
+    dash.add_argument("--host", default="0.0.0.0")
+    dash.add_argument("--port", type=int, default=8000)
+    dash.set_defaults(func=cmd_dashboard)
     return p
 
 

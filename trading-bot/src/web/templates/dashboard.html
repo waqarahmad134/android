@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading Bot · Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#131c2e; --panel2:#0f1726; --line:#243049;
+    --txt:#e6edf7; --muted:#8aa0c0; --green:#27d796; --red:#ff5d6c;
+    --accent:#4f8cff; --gold:#f4c84a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+       background:var(--bg);color:var(--txt)}
+  header{display:flex;align-items:center;justify-content:space-between;
+         padding:16px 24px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:600;font-size:18px}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--green);
+              box-shadow:0 0 10px var(--green)}
+  .meta{display:flex;gap:18px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+  .meta b{color:var(--txt)}
+  .badge{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  .badge.paper{background:rgba(79,140,255,.15);color:var(--accent)}
+  .badge.live{background:rgba(255,93,108,.15);color:var(--red)}
+  .badge.halt{background:rgba(255,93,108,.18);color:var(--red)}
+  .badge.ok{background:rgba(39,215,150,.15);color:var(--green)}
+  main{padding:24px;max-width:1200px;margin:0 auto}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .card .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .card .value{font-size:26px;font-weight:700;margin-top:6px}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+         padding:18px;margin-top:20px}
+  .panel h3{margin:0 0 14px;font-size:15px;color:var(--muted);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .empty{color:var(--muted);padding:18px 12px;font-size:14px}
+  .foot{color:var(--muted);font-size:12px;margin-top:24px;text-align:center;line-height:1.6}
+  canvas{max-height:300px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot" id="liveDot"></span>Multi-Exchange Trading Bot</div>
+  <div class="meta">
+    <span>Mode <span id="mode" class="badge paper">—</span></span>
+    <span>Exchange <b id="exchange">—</b></span>
+    <span>Strategy <b id="strategy">—</b></span>
+    <span>Status <span id="status" class="badge ok">—</span></span>
+    <span>Updated <b id="updated">—</b></span>
+  </div>
+</header>
+
+<main>
+  <section class="cards">
+    <div class="card"><div class="label">Equity</div><div class="value" id="equity">—</div></div>
+    <div class="card"><div class="label">Realized PnL</div><div class="value" id="realized">—</div></div>
+    <div class="card"><div class="label">Locked Reserve</div><div class="value" id="reserve">—</div></div>
+    <div class="card"><div class="label">Open Positions</div><div class="value" id="openCount">—</div></div>
+    <div class="card"><div class="label">Win Rate</div><div class="value" id="winrate">—</div></div>
+  </section>
+
+  <div class="panel">
+    <h3>Equity curve (compounding)</h3>
+    <canvas id="equityChart"></canvas>
+  </div>
+
+  <div class="panel">
+    <h3>Open positions</h3>
+    <table>
+      <thead><tr>
+        <th>Symbol</th><th class="num">Qty</th><th class="num">Entry</th>
+        <th class="num">Price</th><th class="num">Stop</th><th class="num">Target</th>
+        <th class="num">Unrealized</th>
+      </tr></thead>
+      <tbody id="positions"></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Recent trades</h3>
+    <table>
+      <thead><tr>
+        <th>Symbol</th><th class="num">Entry</th><th class="num">Exit</th>
+        <th class="num">Qty</th><th class="num">PnL</th>
+      </tr></thead>
+      <tbody id="trades"></tbody>
+    </table>
+  </div>
+
+  <p class="foot">
+    Read-only viewer · auto-refreshes every 5s · this dashboard cannot place orders.<br>
+    Past performance does not predict future results. No daily return is guaranteed.
+  </p>
+</main>
+
+<script>
+const fmt = (n, d=2) => (n==null||isNaN(n)) ? "—" :
+  Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+const signClass = n => n>0 ? "pos" : n<0 ? "neg" : "";
+
+let chart;
+function initChart(){
+  const ctx = document.getElementById('equityChart');
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{labels:[],datasets:[{
+      label:'Equity', data:[], borderColor:'#4f8cff', borderWidth:2,
+      pointRadius:0, tension:.25,
+      fill:true, backgroundColor:'rgba(79,140,255,.12)'
+    }]},
+    options:{responsive:true, plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#8aa0c0',maxTicksLimit:8},grid:{color:'#243049'}},
+        y:{ticks:{color:'#8aa0c0'},grid:{color:'#243049'}}
+      }}
+  });
+}
+
+async function refresh(){
+  let s;
+  try { s = await (await fetch('/api/state')).json(); }
+  catch(e){ document.getElementById('liveDot').style.background='#ff5d6c'; return; }
+
+  const q = s.quote_currency || 'USDT';
+  document.getElementById('mode').textContent = (s.mode||'—').toUpperCase();
+  document.getElementById('mode').className = 'badge ' + (s.mode==='live'?'live':'paper');
+  document.getElementById('exchange').textContent = s.exchange || '—';
+  document.getElementById('strategy').textContent = s.strategy || '—';
+
+  const st = document.getElementById('status');
+  if(s.halted){ st.textContent='HALTED'; st.className='badge halt'; }
+  else { st.textContent='TRADING'; st.className='badge ok'; }
+
+  document.getElementById('updated').textContent =
+    s.updated_at ? new Date(s.updated_at*1000).toLocaleTimeString() : '—';
+  document.getElementById('liveDot').style.background =
+    (s.updated_at && (Date.now()/1000 - s.updated_at) < 120) ? '#27d796' : '#f4c84a';
+
+  document.getElementById('equity').textContent = fmt(s.equity)+' '+q;
+  const r = document.getElementById('realized');
+  r.textContent = (s.realized_pnl>=0?'+':'')+fmt(s.realized_pnl)+' '+q;
+  r.className = 'value '+signClass(s.realized_pnl);
+  document.getElementById('reserve').textContent = fmt(s.reserve)+' '+q;
+  document.getElementById('openCount').textContent = (s.positions||[]).length;
+
+  const trades = s.closed_trades||[];
+  const wins = trades.filter(t=>t.pnl>0).length;
+  document.getElementById('winrate').textContent =
+    trades.length ? (100*wins/trades.length).toFixed(0)+'%' : '—';
+
+  // positions
+  const pb = document.getElementById('positions'); pb.innerHTML='';
+  if(!(s.positions||[]).length){
+    pb.innerHTML = '<tr><td colspan="7" class="empty">No open positions — waiting for a signal.</td></tr>';
+  } else for(const p of s.positions){
+    pb.insertAdjacentHTML('beforeend', `<tr>
+      <td>${p.symbol}</td>
+      <td class="num">${fmt(p.amount,6)}</td>
+      <td class="num">${fmt(p.entry_price,4)}</td>
+      <td class="num">${fmt(p.price,4)}</td>
+      <td class="num">${fmt(p.stop_loss,4)}</td>
+      <td class="num">${fmt(p.take_profit,4)}</td>
+      <td class="num ${signClass(p.unrealized_pnl)}">${(p.unrealized_pnl>=0?'+':'')+fmt(p.unrealized_pnl)}</td>
+    </tr>`);
+  }
+
+  // trades (most recent first)
+  const tb = document.getElementById('trades'); tb.innerHTML='';
+  if(!trades.length){
+    tb.innerHTML = '<tr><td colspan="5" class="empty">No closed trades yet.</td></tr>';
+  } else for(const t of [...trades].reverse().slice(0,15)){
+    tb.insertAdjacentHTML('beforeend', `<tr>
+      <td>${t.symbol}</td>
+      <td class="num">${fmt(t.entry_price,4)}</td>
+      <td class="num">${fmt(t.exit_price,4)}</td>
+      <td class="num">${fmt(t.amount,6)}</td>
+      <td class="num ${signClass(t.pnl)}">${(t.pnl>=0?'+':'')+fmt(t.pnl)}</td>
+    </tr>`);
+  }
+
+  // equity chart
+  const curve = s.equity_curve||[];
+  chart.data.labels = curve.map(p=>new Date(p.t*1000).toLocaleTimeString());
+  chart.data.datasets[0].data = curve.map(p=>p.equity);
+  chart.update('none');
+}
+
+initChart();
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
