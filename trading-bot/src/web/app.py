@@ -13,6 +13,8 @@ import os
 from flask import Flask, abort, jsonify, render_template, request
 
 from ..configio import env_status, read_config, update_config, update_env
+from ..persistence import load_session
+from ..report import build_report
 from ..state import read_state
 
 EVALUATION_PATH = os.getenv("BOT_EVAL_PATH", "logs/evaluation.json")
@@ -48,6 +50,10 @@ def create_app(state_path: str | None = None, config_path: str = "config/config.
     @app.route("/api/state")
     def api_state():
         return jsonify(_state())
+
+    @app.route("/api/report")
+    def api_report():
+        return jsonify({"text": build_report(load_session())})
 
     @app.route("/api/evaluation")
     def api_evaluation():

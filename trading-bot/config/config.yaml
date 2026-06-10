@@ -116,6 +116,9 @@ notifications:
   # min_level: which events to push. info = everything incl. heartbeats,
   # trade = entries/exits + alerts, alert = only circuit-breaker/critical.
   min_level: trade
+  # Auto-send the readiness report to Slack every N hours (0 = off).
+  # 24 = daily, 168 = weekly. Great for the demo week.
+  report_every_hours: 0
 
 logging:
   level: INFO

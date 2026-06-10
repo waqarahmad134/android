@@ -58,6 +58,7 @@
     <span>Strategy <b id="strategy">—</b></span>
     <span>Status <span id="status" class="badge ok">—</span></span>
     <span>Updated <b id="updated">—</b></span>
+    <a href="#" onclick="downloadReport();return false" style="color:#4f8cff;text-decoration:none;font-weight:600">⬇ Report</a>
     <a href="/settings" style="color:#4f8cff;text-decoration:none;font-weight:600">⚙ Settings</a>
   </div>
 </header>
@@ -273,6 +274,17 @@ async function refresh(){
       <td class="num">${st.trades!=null?st.trades:'—'}</td>
     </tr>`);
   }
+}
+
+async function downloadReport(){
+  try{
+    const {text} = await (await fetch('/api/report')).json();
+    const blob = new Blob([text], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'demo-report-' + new Date().toISOString().slice(0,10) + '.txt';
+    a.click(); URL.revokeObjectURL(a.href);
+  }catch(e){ alert('Could not fetch report: '+e.message); }
 }
 
 initChart();

@@ -91,6 +91,9 @@ python -m src.main dashboard      # http://localhost:8000  (or the compose servi
 
 - **Dashboard:** equity curve, drawdown, PnL & win-rate **by strategy**,
   per-coin active-vs-recommended table, open positions, recent trades. Read-only.
+  The **⬇ Report** link downloads the readiness report as a `.txt`.
+- **Auto report:** set `notifications.report_every_hours` (e.g. `24` daily,
+  `168` weekly) to have the readiness report pushed to Slack on a schedule.
 - **Settings (`/settings`):** edit **every** config value and **all API keys**
   from the browser. Writes are gated behind `ADMIN_TOKEN` (set it in `.env`);
   with it unset the UI is read-only. Risk/strategy/universe edits **hot-reload**

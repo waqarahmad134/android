@@ -45,6 +45,10 @@ class Notifier(ABC):
             level="alert",
         )
 
+    def report(self, text: str) -> None:
+        """Send a full readiness report (monospaced)."""
+        self.send(f":clipboard: *Readiness report*\n```\n{text}\n```", level="alert")
+
     def heartbeat(self, equity: float, reserve: float, open_positions: int, realized: float) -> None:
         self.send(
             f":bar_chart: Equity `{equity:,.2f}` | reserve `{reserve:,.2f}` | "

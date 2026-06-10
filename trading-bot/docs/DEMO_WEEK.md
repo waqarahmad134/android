@@ -34,6 +34,9 @@ live with real money** — is exactly the right approach. This is the step-by-st
   **per-coin active-vs-recommended** table fill in as trades happen.
 - In `auto` mode, once a coin has enough trades (`auto.min_trades`, default 5)
   the bot switches that coin to its best-performing strategy automatically.
+- **Stay updated without watching:** set `notifications.report_every_hours: 24`
+  to get the readiness report in Slack every day, or download it anytime from the
+  dashboard's **⬇ Report** link.
 
 ## Day 7 — decide what goes live
 

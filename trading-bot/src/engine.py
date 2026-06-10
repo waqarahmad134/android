@@ -53,6 +53,7 @@ class TradingEngine:
         self._equity_curve: list[dict] = []  # rolling (time, equity) for the dashboard
         self._started_at = time.time()
         self._start_equity = self.portfolio.cash
+        self._last_report = time.time()  # don't fire a report immediately on boot
         if resume_session:
             self._restore_session()
 
@@ -115,7 +116,7 @@ class TradingEngine:
         except Exception as exc:
             log.warning("Could not restore prior session (starting fresh): %s", exc)
 
-    def _persist_session(self) -> None:
+    def _session_dict(self) -> dict:
         data = {
             "mode": self.cfg.mode,
             "started_at": self._started_at,
@@ -133,10 +134,25 @@ class TradingEngine:
         }
         if self.cfg.mode == "paper" and isinstance(self.exchange, PaperAdapter):
             data["wallet"] = self.exchange.wallet
+        return data
+
+    def _persist_session(self) -> None:
         try:
-            save_session(data)
+            save_session(self._session_dict())
         except Exception as exc:  # persistence must never break trading
             log.warning("Failed to persist session: %s", exc)
+
+    def _maybe_send_report(self) -> None:
+        """Periodically push the readiness report to Slack (if configured)."""
+        hours = float(self.cfg.raw.get("notifications", {}).get("report_every_hours", 0) or 0)
+        if hours <= 0:
+            return
+        now = time.time()
+        if now - self._last_report < hours * 3600:
+            return
+        self._last_report = now
+        from .report import build_report
+        self.notifier.report(build_report(self._session_dict()))
 
     def _maybe_reload_config(self) -> None:
         """Hot-reload tunable settings when config.yaml changes on disk.
@@ -328,6 +344,7 @@ class TradingEngine:
                 )
                 self._write_snapshot(prices, equity)
                 self._persist_session()
+                self._maybe_send_report()
             except KeyboardInterrupt:
                 log.info("Interrupted — shutting down.")
                 break

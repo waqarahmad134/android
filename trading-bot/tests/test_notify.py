@@ -46,3 +46,11 @@ def test_helper_methods_format_and_dispatch():
     assert levels == ["trade", "trade", "alert"]
     assert "ENTER" in rec.messages[0][1]
     assert "EXIT" in rec.messages[1][1]
+
+
+def test_report_helper_sends_as_alert():
+    rec = RecordingNotifier()
+    rec.report("DEMO READINESS REPORT\n  Total return: +6%")
+    assert rec.messages[0][0] == "alert"
+    assert "Readiness report" in rec.messages[0][1]
+    assert "Total return" in rec.messages[0][1]
