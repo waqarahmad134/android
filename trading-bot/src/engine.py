@@ -9,6 +9,7 @@ import time
 
 from .data import MarketData
 from .exchanges import ExchangeAdapter
+from .notify import Notifier, NullNotifier
 from .portfolio import Portfolio
 from .risk import RiskManager
 from .strategies import Strategy
@@ -20,10 +21,12 @@ log = get_logger(__name__)
 
 
 class TradingEngine:
-    def __init__(self, cfg: Config, exchange: ExchangeAdapter, strategy: Strategy):
+    def __init__(self, cfg: Config, exchange: ExchangeAdapter, strategy: Strategy,
+                 notifier: Notifier | None = None):
         self.cfg = cfg
         self.exchange = exchange
         self.strategy = strategy
+        self.notifier = notifier or NullNotifier()
         self.market = MarketData(exchange)
         self.risk = RiskManager(cfg.risk)
 
@@ -60,7 +63,11 @@ class TradingEngine:
         prices = self._prices()
         equity = self.portfolio.equity(prices)
 
+        was_halted = self.risk.halted
         if self.risk.check_circuit_breaker(equity):
+            if not was_halted:  # notify only on the transition into halt
+                drawdown = (self.risk._day_start_equity - equity) / self.risk._day_start_equity
+                self.notifier.circuit_breaker(drawdown * 100)
             log.info("Circuit breaker active — skipping new entries.")
             return
 
@@ -96,6 +103,7 @@ class TradingEngine:
             decision.stop_loss, decision.take_profit,
         )
         log.info("ENTER %s (%s) conf=%.2f", symbol, signal.reason, signal.confidence)
+        self.notifier.entry(symbol, order.amount, order.price, signal.reason)
 
     def _manage_exit(self, symbol: str, price: float) -> None:
         pos = self.portfolio.positions[symbol]
@@ -114,8 +122,9 @@ class TradingEngine:
         if order.status != "closed" or order.amount <= 0:
             log.warning("Exit order for %s did not fill", symbol)
             return
-        self.portfolio.close_position(symbol, order.price, order.cost - order.fee)
+        pnl = self.portfolio.close_position(symbol, order.price, order.cost - order.fee)
         log.info("EXIT %s (%s)", symbol, reason)
+        self.notifier.exit(symbol, order.price, pnl, reason)
 
     # --- continuous run ---
     def run_forever(self) -> None:
@@ -123,13 +132,19 @@ class TradingEngine:
             "Engine starting | mode=%s exchange=%s strategy=%s universe=%s",
             self.cfg.mode, self.cfg.exchange, self.strategy.name, self.cfg.universe,
         )
+        self.notifier.startup(self.cfg.mode, self.cfg.exchange, self.strategy.name, self.cfg.universe)
         while True:
             try:
                 self.step()
                 prices = self._prices()
+                equity = self.portfolio.equity(prices)
                 log.info(
                     "Equity %.2f | reserve %.2f | open %d | realized %.2f",
-                    self.portfolio.equity(prices), self.portfolio.reserve,
+                    equity, self.portfolio.reserve,
+                    len(self.portfolio.positions), self.portfolio.realized_pnl,
+                )
+                self.notifier.heartbeat(
+                    equity, self.portfolio.reserve,
                     len(self.portfolio.positions), self.portfolio.realized_pnl,
                 )
             except KeyboardInterrupt:

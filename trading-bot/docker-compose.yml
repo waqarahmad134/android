@@ -1,0 +1,23 @@
+# Run the bot 24/7:  docker compose up -d   (then `docker compose logs -f`)
+#
+# Safe by default: paper mode, no real orders. To go live, edit
+# config/config.yaml (mode: live) and provide API keys in .env.
+services:
+  trading-bot:
+    build: .
+    image: multi-exchange-trading-bot:latest
+    container_name: trading-bot
+    restart: unless-stopped          # auto-recover from crashes / reboots
+    env_file:
+      - .env                         # API keys + SLACK_WEBHOOK_URL
+    volumes:
+      - ./config:/app/config:ro      # edit config without rebuilding
+      - ./logs:/app/logs             # persist logs on the host
+    # Resource guardrails (optional — tune to your host).
+    mem_limit: 512m
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

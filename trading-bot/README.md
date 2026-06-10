@@ -33,10 +33,12 @@ gold/silver. The closest *safer* instruments available on-exchange are:
 |---------------|----------------------------|
 | Gold          | **PAXG** (Pax Gold) / **XAUT** (Tether Gold) — 1 token ≈ 1oz gold |
 | Silver        | Tokenized silver where listed (e.g. `KAG`/`XAGx` on some venues) |
-| "Safest coins"| BTC, ETH and other top-cap majors (deepest liquidity, lowest slippage) |
+| "Safest coins"| BTC, ETH, BNB, SOL, XRP, ADA and other top-cap majors (deepest liquidity, lowest slippage) |
 | Stablecoin parking | USDT / USDC held when no good signal exists |
 
-The asset universe is fully configurable in `config/config.yaml`.
+The asset universe is fully configurable in `config/config.yaml` — add or remove
+any pair your exchange lists. Tokenized gold/silver is optional; the default
+universe is a basket of high-liquidity majors.
 
 ## Architecture
 
@@ -47,12 +49,15 @@ trading-bot/
     strategies/     # Pluggable signal generators (EMA, RSI mean-reversion, momentum, ensemble)
     risk/           # Position sizing, stop-loss / take-profit, daily circuit breaker
     portfolio/      # Equity tracking + compounding engine
+    notify/         # Slack alerts (incoming webhook, stdlib only)
     data/           # OHLCV fetch + technical indicators
     utils/          # Logging, config loading
     engine.py       # Main trading loop (paper or live)
     backtest.py     # Historical simulator
     main.py         # CLI entry point
   config/config.yaml
+  Dockerfile        # 24/7 container image
+  docker-compose.yml
   tests/
 ```
 
@@ -76,6 +81,34 @@ python -m src.main run
 # 4. ONLY after you trust it: enable live trading
 #    set mode: live in config.yaml and provide API keys in .env
 ```
+
+## Run it 24/7 with Docker
+
+```bash
+cd trading-bot
+cp .env.example .env          # add keys only when going live; Slack URL optional
+docker compose up -d --build  # starts in the background (paper mode by default)
+docker compose logs -f        # watch live activity
+docker compose down           # stop
+```
+
+`restart: unless-stopped` auto-recovers the bot across crashes and host reboots.
+`config/` is mounted read-only, so you can tweak `config.yaml` and `docker
+compose restart` without rebuilding. Logs persist on the host under `./logs`.
+
+## Slack alerts
+
+Telegram can be unreliable in some regions (missed/delayed alerts); Slack
+Incoming Webhooks deliver consistently worldwide and need no app token.
+
+1. Create a webhook: <https://api.slack.com/messaging/webhooks>
+2. Put the URL in `.env` as `SLACK_WEBHOOK_URL=...`
+3. Set `notifications.enabled: true` in `config/config.yaml`
+
+You'll get pinged on **entries, exits, and the daily circuit breaker**. Tune
+`notifications.min_level` (`info` = everything incl. heartbeats, `trade` =
+trades + alerts, `alert` = circuit-breaker only). Alert delivery never blocks or
+crashes the trading loop — a failed send is logged and skipped.
 
 ## Safety defaults
 

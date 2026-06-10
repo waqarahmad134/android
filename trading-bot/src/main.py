@@ -13,6 +13,7 @@ import sys
 from .backtest import run_backtest
 from .engine import TradingEngine
 from .exchanges import create_exchange
+from .notify import create_notifier
 from .strategies import create_strategy
 from .utils import load_config
 from .utils.logger import configure_logging, get_logger
@@ -41,7 +42,8 @@ def cmd_run(args):
         time.sleep(5)
     exchange = create_exchange(cfg)
     strategy = create_strategy(cfg.strategy, cfg.strategy_params)
-    TradingEngine(cfg, exchange, strategy).run_forever()
+    notifier = create_notifier(cfg.raw.get("notifications", {}))
+    TradingEngine(cfg, exchange, strategy, notifier).run_forever()
 
 
 def cmd_backtest(args):

@@ -26,11 +26,16 @@ paper_starting_equity: 10000
 # -----------------------------------------------------------------------------
 universe:
   - BTC/USDT      # deepest liquidity, lowest slippage
-  - ETH/USDT
-  - PAXG/USDT     # Pax Gold — 1 token ≈ 1 oz gold
+  - ETH/USDT      # second-deepest major
+  - BNB/USDT      # large-cap exchange token
+  - SOL/USDT      # high-liquidity major
+  - XRP/USDT      # large-cap major
+  - ADA/USDT      # large-cap major
+  - PAXG/USDT     # Pax Gold — 1 token ≈ 1 oz gold (tokenized commodity)
   # - XAUT/USDT   # Tether Gold (enable if listed on your exchange)
-  # - BNB/USDT
-  # - SOL/USDT
+  # - LTC/USDT
+  # - DOGE/USDT
+  # Add/remove freely — prefer top-cap, high-liquidity pairs to minimize slippage.
 
 # How often the trading loop wakes up to evaluate signals.
 timeframe: 1h            # candle size used for signals
@@ -77,6 +82,19 @@ compounding:
   # Optional: skim a fraction of realized profit into a "safe" reserve that the
   # bot will not trade, locking in gains. 0 = reinvest everything.
   profit_reserve_pct: 0.20
+
+# -----------------------------------------------------------------------------
+# Notifications — get pinged on every trade / circuit-breaker event.
+# Slack uses an Incoming Webhook (reliable globally; no app store needed).
+# Put the webhook URL in SLACK_WEBHOOK_URL in your .env.
+# -----------------------------------------------------------------------------
+notifications:
+  enabled: false           # set true and add SLACK_WEBHOOK_URL to .env
+  provider: slack
+  username: trading-bot
+  # min_level: which events to push. info = everything incl. heartbeats,
+  # trade = entries/exits + alerts, alert = only circuit-breaker/critical.
+  min_level: trade
 
 logging:
   level: INFO
