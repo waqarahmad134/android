@@ -1,0 +1,83 @@
+# =============================================================================
+# Multi-Exchange Trading Bot — configuration
+# =============================================================================
+
+# "paper" = simulated fills, no real orders (SAFE DEFAULT).
+# "live"  = places real orders. Requires API keys in .env. Read the README first.
+mode: paper
+
+# Which exchange to route live/paper market data and orders through.
+# One of: binance, kucoin, bybit
+exchange: binance
+
+# Use the exchange testnet/sandbox endpoint when available (live mode only).
+use_sandbox: true
+
+# Quote currency the bot accounts in and parks idle capital in.
+quote_currency: USDT
+
+# Starting equity for paper trading / backtests (units of quote_currency).
+paper_starting_equity: 10000
+
+# -----------------------------------------------------------------------------
+# Asset universe — the "safer" instruments the bot is allowed to trade.
+# These crypto venues do not list real equities or physical metals; the closest
+# safer instruments are large-cap majors and tokenized gold/silver.
+# -----------------------------------------------------------------------------
+universe:
+  - BTC/USDT      # deepest liquidity, lowest slippage
+  - ETH/USDT
+  - PAXG/USDT     # Pax Gold — 1 token ≈ 1 oz gold
+  # - XAUT/USDT   # Tether Gold (enable if listed on your exchange)
+  # - BNB/USDT
+  # - SOL/USDT
+
+# How often the trading loop wakes up to evaluate signals.
+timeframe: 1h            # candle size used for signals
+poll_interval_seconds: 300
+
+# -----------------------------------------------------------------------------
+# Strategy selection. One of: ema_crossover, rsi_mean_reversion, momentum, ensemble
+# "ensemble" combines the others and only acts on majority agreement.
+# -----------------------------------------------------------------------------
+strategy: ensemble
+
+strategy_params:
+  ema_crossover:
+    fast: 12
+    slow: 26
+  rsi_mean_reversion:
+    period: 14
+    oversold: 30
+    overbought: 70
+  momentum:
+    lookback: 24
+    threshold_pct: 1.5
+  ensemble:
+    min_agreement: 2   # need >= 2 sub-strategies agreeing to act
+
+# -----------------------------------------------------------------------------
+# Risk management — capital preservation comes first.
+# -----------------------------------------------------------------------------
+risk:
+  max_position_pct: 0.15        # max fraction of equity in a single position
+  max_total_exposure_pct: 0.60  # max fraction of equity deployed across all positions
+  max_open_positions: 4
+  stop_loss_pct: 0.02           # hard stop: exit if position drops 2%
+  take_profit_pct: 0.04         # take profit at +4% (2:1 reward:risk)
+  trailing_stop_pct: 0.015      # trail the stop once in profit
+  daily_loss_limit_pct: 0.03    # circuit breaker: halt for the day after -3% equity
+  per_trade_risk_pct: 0.01      # risk at most 1% of equity per trade (sizing)
+
+# -----------------------------------------------------------------------------
+# Compounding — reinvest profits by sizing off *current* equity, not the start.
+# -----------------------------------------------------------------------------
+compounding:
+  enabled: true
+  # Optional: skim a fraction of realized profit into a "safe" reserve that the
+  # bot will not trade, locking in gains. 0 = reinvest everything.
+  profit_reserve_pct: 0.20
+
+logging:
+  level: INFO
+  file: logs/bot.log
