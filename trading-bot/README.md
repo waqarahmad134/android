@@ -145,6 +145,18 @@ You'll get pinged on **entries, exits, and the daily circuit breaker**. Tune
 trades + alerts, `alert` = circuit-breaker only). Alert delivery never blocks or
 crashes the trading loop — a failed send is logged and skipped.
 
+## Demo week → go live
+
+The intended workflow: run in **paper mode for ~1 week** to learn each coin, then
+go live. The bot persists its progress to `logs/session.json` every loop, so a
+restart **resumes** — your week of learning isn't lost. At the end:
+
+```bash
+python -m src.main report     # readiness report with a go/no-go verdict per coin
+```
+
+Full step-by-step in **`docs/DEMO_WEEK.md`**.
+
 ## Safety defaults
 
 - `mode: paper` — simulated execution until you explicitly switch to `live`.

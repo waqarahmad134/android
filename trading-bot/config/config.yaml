@@ -55,7 +55,10 @@ strategy: ensemble
 #   auto    : adaptive — pick the best live performer per coin once enough trades
 #             exist, else the backtest recommendation, else `default`.
 strategy_selection:
-  mode: single             # single | routing | auto
+  # 'auto' suits the demo week: it learns the best strategy per coin from results
+  # (seed it first with `python -m src.main evaluate`). Use 'single' for one
+  # strategy everywhere, or 'routing' for an explicit per-coin map.
+  mode: auto               # single | routing | auto
   default: ensemble
   routing:                 # used when mode: routing
     default: ensemble

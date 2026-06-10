@@ -4,6 +4,7 @@ Usage:
     python -m src.main run                       # live/paper trading loop
     python -m src.main backtest --symbol BTC/USDT --strategy ensemble --days 180
     python -m src.main evaluate --days 180       # rank strategies per coin
+    python -m src.main report                    # demo readiness / go-live report
     python -m src.main dashboard                 # web dashboard + admin
     python -m src.main balance                   # show account balances
 """
@@ -117,6 +118,12 @@ def cmd_evaluate(args):
     print(f"Saved to {args.out} — apply it from the dashboard Settings page.\n")
 
 
+def cmd_report(args):
+    _setup(args)
+    from .report import print_report
+    print_report(args.session)
+
+
 def cmd_balance(args):
     cfg = _setup(args)
     exchange = create_exchange(cfg)
@@ -153,6 +160,10 @@ def build_parser() -> argparse.ArgumentParser:
                     choices=["total_return_pct", "win_rate"], help="ranking metric")
     ev.add_argument("--out", default="logs/evaluation.json", help="output file")
     ev.set_defaults(func=cmd_evaluate)
+
+    rep = sub.add_parser("report", help="demo readiness / go-live report")
+    rep.add_argument("--session", help="path to session.json (default logs/session.json)")
+    rep.set_defaults(func=cmd_report)
 
     sub.add_parser("balance", help="show account balance").set_defaults(func=cmd_balance)
 

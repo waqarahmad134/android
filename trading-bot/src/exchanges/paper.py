@@ -36,6 +36,15 @@ class PaperAdapter(ExchangeAdapter):
         # Simulated wallet: currency -> free amount.
         self._wallet: dict[str, float] = {quote_currency: float(starting_equity)}
 
+    # --- wallet persistence (paper sessions are resumable) ---
+    @property
+    def wallet(self) -> dict[str, float]:
+        return dict(self._wallet)
+
+    def restore_wallet(self, wallet: dict[str, float]) -> None:
+        if wallet:
+            self._wallet = {k: float(v) for k, v in wallet.items()}
+
     # --- market data delegates to the real source ---
     def fetch_ohlcv(self, symbol, timeframe="1h", limit=500):
         return self._data.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)

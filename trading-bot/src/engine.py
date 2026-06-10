@@ -12,8 +12,10 @@ import time
 
 from .data import MarketData
 from .exchanges import ExchangeAdapter
+from .exchanges.paper import PaperAdapter
 from .notify import Notifier, NullNotifier
-from .portfolio import Portfolio
+from .persistence import load_session, save_session, tracker_from_snapshot
+from .portfolio import Portfolio, Position
 from .risk import RiskManager
 from .state import write_state
 from .strategies.base import Action
@@ -28,7 +30,8 @@ log = get_logger(__name__)
 
 class TradingEngine:
     def __init__(self, cfg: Config, exchange: ExchangeAdapter, router: StrategyRouter,
-                 notifier: Notifier | None = None, config_path: str = "config/config.yaml"):
+                 notifier: Notifier | None = None, config_path: str = "config/config.yaml",
+                 resume_session: bool = True):
         self.cfg = cfg
         self.exchange = exchange
         self.router = router
@@ -48,6 +51,10 @@ class TradingEngine:
         )
         self._day_index: int | None = None
         self._equity_curve: list[dict] = []  # rolling (time, equity) for the dashboard
+        self._started_at = time.time()
+        self._start_equity = self.portfolio.cash
+        if resume_session:
+            self._restore_session()
 
     # --- helpers ---
     @staticmethod
@@ -59,6 +66,77 @@ class TradingEngine:
 
     def _prices(self) -> dict[str, float]:
         return {s: self.exchange.fetch_price(s) for s in self.cfg.universe}
+
+    def _serialize_positions(self) -> list[dict]:
+        return [
+            {"symbol": p.symbol, "amount": p.amount, "entry_price": p.entry_price,
+             "stop_loss": p.stop_loss, "take_profit": p.take_profit,
+             "peak_price": p.peak_price, "strategy": p.strategy}
+            for p in self.portfolio.positions.values()
+        ]
+
+    # --- session persistence (resumable across restarts) ---
+    def _restore_session(self) -> None:
+        sess = load_session()
+        if not sess:
+            return
+        try:
+            # Learning history + accounting — restored in both modes.
+            restored = tracker_from_snapshot(sess.get("performance", {}))
+            self.tracker = restored
+            self.router.tracker = restored
+            self.portfolio.closed_trades = sess.get("closed_trades", [])
+            self.portfolio.realized_pnl = sess.get("realized_pnl", 0.0)
+            self.portfolio.reserve = sess.get("reserve", 0.0)
+            self._equity_curve = sess.get("equity_curve", [])
+            self._started_at = sess.get("started_at", self._started_at)
+            self._start_equity = sess.get("start_equity", self._start_equity)
+            self._day_index = sess.get("day_index", self._day_index)
+            if sess.get("day_start_equity") is not None:
+                self.risk._day_start_equity = sess["day_start_equity"]
+                self.risk._halted = bool(sess.get("halted", False))
+
+            # Paper-only: wallet + open positions (live mode trusts the exchange).
+            if self.cfg.mode == "paper" and isinstance(self.exchange, PaperAdapter):
+                self.exchange.restore_wallet(sess.get("wallet", {}))
+                self.portfolio.cash = sess.get("cash", self.portfolio.cash)
+                for pd in sess.get("positions", []):
+                    self.portfolio.positions[pd["symbol"]] = Position(
+                        symbol=pd["symbol"], amount=pd["amount"], entry_price=pd["entry_price"],
+                        stop_loss=pd["stop_loss"], take_profit=pd["take_profit"],
+                        peak_price=pd.get("peak_price", pd["entry_price"]),
+                        strategy=pd.get("strategy", ""),
+                    )
+            log.info(
+                "Resumed session: %d closed trades, %d equity points, %d open positions",
+                len(self.portfolio.closed_trades), len(self._equity_curve),
+                len(self.portfolio.positions),
+            )
+        except Exception as exc:
+            log.warning("Could not restore prior session (starting fresh): %s", exc)
+
+    def _persist_session(self) -> None:
+        data = {
+            "mode": self.cfg.mode,
+            "started_at": self._started_at,
+            "start_equity": self._start_equity,
+            "cash": self.portfolio.cash,
+            "realized_pnl": self.portfolio.realized_pnl,
+            "reserve": self.portfolio.reserve,
+            "day_index": self._day_index,
+            "day_start_equity": self.risk._day_start_equity,
+            "halted": self.risk.halted,
+            "positions": self._serialize_positions(),
+            "closed_trades": self.portfolio.closed_trades,
+            "equity_curve": self._equity_curve,
+            "performance": self.tracker.snapshot(),
+        }
+        if self.cfg.mode == "paper" and isinstance(self.exchange, PaperAdapter):
+            data["wallet"] = self.exchange.wallet
+        try:
+            save_session(data)
+        except Exception as exc:  # persistence must never break trading
+            log.warning("Failed to persist session: %s", exc)
 
     def _maybe_reload_config(self) -> None:
         """Hot-reload tunable settings when config.yaml changes on disk.
@@ -249,6 +327,7 @@ class TradingEngine:
                     len(self.portfolio.positions), self.portfolio.realized_pnl,
                 )
                 self._write_snapshot(prices, equity)
+                self._persist_session()
             except KeyboardInterrupt:
                 log.info("Interrupted — shutting down.")
                 break
