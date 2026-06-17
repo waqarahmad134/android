@@ -1,0 +1,17 @@
+# Core runtime dependencies for VibeVoice Studio.
+#
+# The VibeVoice model package itself is installed separately (it is a git
+# package, see the README), because Microsoft removed the official PyPI/GitHub
+# release and people now use the community fork:
+#
+#   pip install "vibevoice @ git+https://github.com/vibevoice-community/VibeVoice"
+#
+# torch is intentionally left flexible — install the build that matches your
+# platform/CUDA from https://pytorch.org/get-started/locally/ for best results.
+
+gradio>=4.44
+torch>=2.2
+numpy>=1.24
+soundfile>=0.12
+librosa>=0.10
+huggingface_hub>=0.24

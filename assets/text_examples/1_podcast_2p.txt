@@ -1,0 +1,6 @@
+Speaker 1: Welcome back to Open Source Weekly. I'm your host, and today we're talking about local AI audio.
+Speaker 2: Happy to be here. It still amazes me that we can generate a full podcast on a single GPU now.
+Speaker 1: Right? No API keys, no per-minute billing. You write a script, pick some voices, and hit generate.
+Speaker 2: And with voice cloning you can even narrate in your own voice. That's a game changer for creators.
+Speaker 1: Let's get into how it actually works under the hood.
+Speaker 2: After a quick break, we'll break down the model architecture and the streaming pipeline.

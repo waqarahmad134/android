@@ -1,36 +1,35 @@
-# Godot 4+ specific ignores
-godot-project/.godot/
-godot-project/.import/
-godot-project/export.cfg
-godot-project/export_presets.cfg
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
 
-# Imported translations (automatically generated from CSV files)
-*.translation
+# Generated audio & runtime cache
+outputs/*
+!outputs/.gitkeep
+*.wav
 
-# Mono-specific ignores
-godot-project/.mono/
-godot-project/data_*/
+# Preset/cloned voice samples (add your own locally)
+assets/voices/*.wav
 
-# System / build artifacts
-builds/
-*.apk
-*.aab
-*.keystore
-*.jks
-*.pkcs12
+# Model weights / HuggingFace cache
+models/
+.cache/
+*.safetensors
+*.bin
+*.pt
 
-# Android export presets / signing config — never commit secrets
-android-export/keystore.cfg
-android-export/*.keystore
-android-export/*.jks
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
-# OS noise
+# OS / editor
 .DS_Store
-Thumbs.db
-*.swp
-*.swo
-
-# IDE
-.vscode/
 .idea/
-*.iml
+.vscode/

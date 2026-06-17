@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vibevoice-studio"
+version = "0.1.0"
+description = "Local, no-API podcast & story audio generator powered by VibeVoice-1.5B"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "gradio>=4.44",
+    "torch>=2.2",
+    "numpy>=1.24",
+    "soundfile>=0.12",
+    "librosa>=0.10",
+    "huggingface_hub>=0.24",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.5"]
+
+[project.scripts]
+vibevoice-studio = "app:main"
+vibevoice-cli = "cli:main"
+
+[tool.setuptools]
+py-modules = ["app", "cli"]
+
+[tool.setuptools.packages.find]
+include = ["vibevoice_studio*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["requires_weights: tests that need the real VibeVoice model weights"]
