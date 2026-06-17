@@ -34,9 +34,12 @@ huggingface-cli download vibevoice/VibeVoice-1.5B
 python scripts/make_demo_voices.py
 ```
 
-> **Try it first without weights:** `VIBEVOICE_MOCK=1 python app.py` launches the
-> full UI using a mock engine that fabricates a placeholder tone. Great for
-> verifying the workflow before downloading several GB of weights.
+> **Mock mode = a beep, not speech.** `VIBEVOICE_MOCK=1 python app.py` (or
+> `python app.py --mock`) launches the full UI with a mock engine that outputs a
+> **placeholder tone** — useful to verify the workflow before downloading the
+> weights. For **real voices**, install the model (steps 3–4), make sure mock is
+> off (`unset VIBEVOICE_MOCK`), and run `python app.py` with **no** `--mock`. The
+> banner at the top of the UI shows `mock: True/False`.
 >
 > The placeholder voices from step 5 are synthetic tones — **replace them with
 > real 10–30s speech samples** in `assets/voices/` for actual generation.

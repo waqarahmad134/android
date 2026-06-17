@@ -62,13 +62,22 @@ class VibeVoiceEngine(GenerationEngine):
         return self.model is not None and self.processor is not None
 
     def load(self) -> None:
-        import torch  # noqa: PLC0415
-        from vibevoice.modular.modeling_vibevoice_inference import (  # noqa: PLC0415
-            VibeVoiceForConditionalGenerationInference,
-        )
-        from vibevoice.processor.vibevoice_processor import (  # noqa: PLC0415
-            VibeVoiceProcessor,
-        )
+        try:
+            import torch  # noqa: PLC0415
+            from vibevoice.modular.modeling_vibevoice_inference import (  # noqa: PLC0415
+                VibeVoiceForConditionalGenerationInference,
+            )
+            from vibevoice.processor.vibevoice_processor import (  # noqa: PLC0415
+                VibeVoiceProcessor,
+            )
+        except ImportError as exc:
+            raise RuntimeError(
+                "The real VibeVoice model is not installed, so only mock-mode "
+                "(placeholder beep) audio is available. Install it with:\n"
+                "  pip install -r requirements.txt\n"
+                '  pip install "vibevoice @ git+https://github.com/vibevoice-community/VibeVoice"\n'
+                "then run again without mock mode."
+            ) from exc
 
         self.device = detect_device(self.cfg.device)
         dtype = select_dtype(self.device, self.cfg.dtype)

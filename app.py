@@ -39,6 +39,13 @@ def _runtime_banner(cfg: GenerationConfig, mock: bool) -> str:
         f"&nbsp;·&nbsp; **attention:** `{rt.attn_implementation}` "
         f"&nbsp;·&nbsp; **mock:** `{rt.mock}`"
     ]
+    if rt.mock:
+        lines.append(
+            "### ⚠️ Mock mode — you will only hear a placeholder **beep**, not speech.\n"
+            "To generate real voices, stop the app, run without mock "
+            "(`unset VIBEVOICE_MOCK` and start with `python app.py`), and make sure the "
+            "VibeVoice model is installed (see the README)."
+        )
     lines += [f"> {note}" for note in rt.notes]
     return "\n\n".join(lines)
 
