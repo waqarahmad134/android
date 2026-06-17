@@ -83,6 +83,11 @@ class VibeVoiceEngine(GenerationEngine):
         dtype = select_dtype(self.device, self.cfg.dtype)
         attn = select_attn_implementation(self.device, self.cfg.attn_implementation)
 
+        if self.device == "mps":
+            # Some model ops are not yet implemented on Apple's Metal backend;
+            # let PyTorch fall back to CPU for those instead of crashing.
+            os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
         logger.info(
             "Loading %s on %s (dtype=%s, attn=%s)...",
             self.cfg.model_id,

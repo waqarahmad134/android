@@ -34,6 +34,14 @@ huggingface-cli download vibevoice/VibeVoice-1.5B
 python scripts/make_demo_voices.py
 ```
 
+**Shortcut (macOS / Linux):** steps 1–3 and 5 in one go:
+
+```bash
+./scripts/setup.sh
+source .venv/bin/activate
+python app.py
+```
+
 > **Two quality tiers:**
 > - **Preview mode** (`VIBEVOICE_MOCK=1 python app.py` or `--mock`, or the
 >   checkbox in the UI) **actually speaks your script** using your computer's
@@ -160,6 +168,23 @@ python scripts/make_demo_voices.py      # placeholder voices for a quick smoke t
 VIBEVOICE_MOCK=1 python cli.py --script assets/text_examples/1_podcast_2p.txt \
   --voice "Speaker 1=Alice" --voice "Speaker 2=Carter" --out outputs/test.wav
 ```
+
+## Troubleshooting
+
+- **First real run is slow / seems stuck** — it's downloading the ~3GB weights
+  from HuggingFace and loading them. Subsequent runs are much faster.
+- **Apple Silicon (MPS) error about an unsupported operator** — the app sets
+  `PYTORCH_ENABLE_MPS_FALLBACK=1` automatically so unsupported ops fall back to
+  CPU. If you still hit it, run `PYTORCH_ENABLE_MPS_FALLBACK=1 python app.py` or
+  force CPU with the Device dropdown.
+- **`pip install vibevoice ...` fails on Python 3.12+** — the model package pins
+  `transformers==4.51.3`; use **Python 3.10 or 3.11** (`python3.11 -m venv .venv`).
+- **`soundfile`/`librosa` can't read audio** — install ffmpeg: macOS
+  `brew install ffmpeg`, Debian/Ubuntu `sudo apt install ffmpeg libsndfile1`.
+- **Preview mode only beeps** — no system voice was found. macOS/Windows have one
+  built in; on Linux install `espeak-ng` (`sudo apt install espeak-ng`).
+- **Cloned voice doesn't sound like me** — use a longer (15–30s), clean,
+  single-speaker sample with little background noise.
 
 ## License
 
