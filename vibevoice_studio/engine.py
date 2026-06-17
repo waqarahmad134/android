@@ -124,45 +124,50 @@ class VibeVoiceEngine(GenerationEngine):
         if cfg.seed is not None:
             torch.manual_seed(cfg.seed)
 
+        # Normalise curly apostrophes like the official demo does.
+        engine_text = engine_text.replace("’", "'")
         sample_paths = [str(p) for p in voice_sample_paths]
         inputs = self.processor(
             text=[engine_text],
             voice_samples=[sample_paths],
             padding=True,
             return_tensors="pt",
+            return_attention_mask=True,
         )
+        # Move every tensor to the target device (mirrors demo/inference_from_file.py).
         if self.device and self.device != "cpu":
-            inputs = {
-                k: (v.to(self.device) if hasattr(v, "to") else v) for k, v in dict(inputs).items()
-            }
-
-        gen_kwargs = {"cfg_scale": cfg.cfg_scale, "tokenizer": self.processor.tokenizer}
-        if cfg.max_new_tokens:
-            gen_kwargs["max_new_tokens"] = cfg.max_new_tokens
+            for key, value in dict(inputs).items():
+                if torch.is_tensor(value):
+                    inputs[key] = value.to(self.device)
 
         with torch.no_grad():
-            outputs = self.model.generate(**inputs, **gen_kwargs)
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=cfg.max_new_tokens,
+                cfg_scale=cfg.cfg_scale,
+                tokenizer=self.processor.tokenizer,
+                generation_config={"do_sample": False},
+                verbose=False,
+            )
 
         audio = self._extract_audio(outputs)
         return audio, SAMPLE_RATE
 
     @staticmethod
     def _extract_audio(outputs):
-        """Pull a 1-D numpy waveform out of the model's generate() result."""
+        """Pull a 1-D numpy waveform out of the model's generate() result.
+
+        The model returns ``outputs.speech_outputs`` (a list with one waveform
+        tensor per batch item); we use the first item, as the official demo does.
+        """
         import numpy as np  # noqa: PLC0415
 
-        candidate = outputs
-        for attr in ("speech_outputs", "audios", "audio", "waveform"):
-            if hasattr(candidate, attr):
-                candidate = getattr(candidate, attr)
-                break
-
+        candidate = getattr(outputs, "speech_outputs", outputs)
         if isinstance(candidate, (list, tuple)):
             candidate = candidate[0]
         if hasattr(candidate, "detach"):
             candidate = candidate.detach().to("cpu").float().numpy()
-        candidate = np.asarray(candidate, dtype="float32").reshape(-1)
-        return candidate
+        return np.asarray(candidate, dtype="float32").reshape(-1)
 
 
 class MockEngine(GenerationEngine):
