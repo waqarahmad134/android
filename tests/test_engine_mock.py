@@ -7,8 +7,8 @@ any model weights.
 import wave
 
 from vibevoice_studio.config import SAMPLE_RATE, GenerationConfig
-from vibevoice_studio.engine import MockEngine, make_engine
-from vibevoice_studio.generate import generate, get_or_create_engine
+from vibevoice_studio.engine import MockEngine, PreviewEngine, make_engine
+from vibevoice_studio.generate import generate
 from vibevoice_studio.voices import VoiceLibrary
 
 
@@ -32,14 +32,15 @@ def _library(tmp_path):
 
 
 def test_make_engine_mock():
-    assert isinstance(make_engine(GenerationConfig(), mock=True), MockEngine)
+    # Mock/preview mode now uses the offline system-voice PreviewEngine.
+    assert isinstance(make_engine(GenerationConfig(), mock=True), PreviewEngine)
 
 
 def test_generate_end_to_end_mock(tmp_path):
     lib = _library(tmp_path)
     out = tmp_path / "out.wav"
     cfg = GenerationConfig()
-    engine = get_or_create_engine(cfg, mock=True)
+    engine = MockEngine(cfg)  # deterministic tone, no system-TTS dependency
 
     result = generate(
         script_text="Speaker 1: Hello there.\nSpeaker 2: General Kenobi.",
@@ -63,7 +64,7 @@ def test_generate_end_to_end_mock(tmp_path):
 def test_generate_invalid_script_raises(tmp_path):
     lib = _library(tmp_path)
     cfg = GenerationConfig()
-    engine = get_or_create_engine(cfg, mock=True)
+    engine = MockEngine(cfg)
     import pytest
 
     from vibevoice_studio.generate import GenerationError

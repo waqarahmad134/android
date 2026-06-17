@@ -15,3 +15,8 @@ numpy>=1.24
 soundfile>=0.12
 librosa>=0.10
 huggingface_hub>=0.24
+
+# Offline "preview" voice (speaks real words without the heavy model).
+# On Linux it needs the system 'espeak'/'espeak-ng' package; macOS & Windows
+# use their built-in speech engines out of the box.
+pyttsx3>=2.90

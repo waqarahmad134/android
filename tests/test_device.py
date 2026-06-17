@@ -61,4 +61,4 @@ def test_attn_cuda_without_flash_is_sdpa(monkeypatch):
 def test_describe_runtime_mock():
     rt = device.describe_runtime(GenerationConfig(), mock=True)
     assert rt.mock is True
-    assert rt.device == "cpu"
+    assert rt.device == "system"

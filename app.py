@@ -12,7 +12,7 @@ import argparse
 
 from vibevoice_studio.config import MAX_SPEAKERS, AppPaths, GenerationConfig
 from vibevoice_studio.device import describe_runtime
-from vibevoice_studio.engine import force_mock_env
+from vibevoice_studio.engine import force_mock_env, model_available
 from vibevoice_studio.generate import (
     GenerationError,
     generate,
@@ -41,10 +41,17 @@ def _runtime_banner(cfg: GenerationConfig, mock: bool) -> str:
     ]
     if rt.mock:
         lines.append(
-            "### ⚠️ Mock mode — you will only hear a placeholder **beep**, not speech.\n"
-            "To generate real voices, stop the app, run without mock "
-            "(`unset VIBEVOICE_MOCK` and start with `python app.py`), and make sure the "
-            "VibeVoice model is installed (see the README)."
+            "### 🔊 Preview mode — real words spoken by your **system voice** "
+            "(instant, offline, but *not* your cloned voice).\n"
+            "Uncheck **Preview mode** under *Advanced settings* for full VibeVoice "
+            "quality with voice cloning (the model must be installed — see the README)."
+        )
+    elif not model_available():
+        lines.append(
+            "### ⚠️ Real mode selected, but the VibeVoice model is **not installed**.\n"
+            "Install it, then generate:\n"
+            "```\npip install -r requirements.txt\n"
+            'pip install "vibevoice @ git+https://github.com/vibevoice-community/VibeVoice"\n```'
         )
     lines += [f"> {note}" for note in rt.notes]
     return "\n\n".join(lines)
@@ -72,7 +79,7 @@ def build_demo(mock: bool = False):
 
     with gr.Blocks(title="VibeVoice Studio") as demo:
         gr.Markdown("# 🎙️ VibeVoice Studio\nLocal, no-API podcast & story generator powered by VibeVoice-1.5B.")
-        gr.Markdown(_runtime_banner(base_cfg, mock))
+        banner = gr.Markdown(_runtime_banner(base_cfg, mock))
 
         with gr.Row():
             with gr.Column(scale=3):
@@ -109,6 +116,10 @@ def build_demo(mock: bool = False):
                     add_clone_btn = gr.Button("Add cloned voice")
 
                 with gr.Accordion("Advanced settings", open=False):
+                    mock_toggle = gr.Checkbox(
+                        label="Preview mode (instant offline system voice — no model weights, no cloning)",
+                        value=mock,
+                    )
                     device_dd = gr.Dropdown(
                         label="Device", choices=["auto", "cuda", "mps", "cpu"], value="auto"
                     )
@@ -131,6 +142,13 @@ def build_demo(mock: bool = False):
 
         example_dd.change(on_load_example, inputs=example_dd, outputs=script)
 
+        def on_toggle_mock(mock_on, device):
+            cfg = GenerationConfig(device=None if device == "auto" else device)
+            return _runtime_banner(cfg, bool(mock_on))
+
+        mock_toggle.change(on_toggle_mock, inputs=[mock_toggle, device_dd], outputs=banner)
+        device_dd.change(on_toggle_mock, inputs=[mock_toggle, device_dd], outputs=banner)
+
         def on_add_clone(audio_path, label):
             if not audio_path:
                 return [gr.update() for _ in speaker_dropdowns] + ["⚠️ Upload or record a sample first."]
@@ -146,7 +164,7 @@ def build_demo(mock: bool = False):
             outputs=speaker_dropdowns + [status],
         )
 
-        def on_generate(script_text, v1, v2, v3, v4, device, cfg_scale_val, seed_val, progress=gr.Progress()):  # noqa: B008
+        def on_generate(script_text, v1, v2, v3, v4, device, cfg_scale_val, seed_val, mock_on, progress=gr.Progress()):  # noqa: B008
             assignment_all = {1: v1, 2: v2, 3: v3, 4: v4}
             parsed = parse_script(script_text)
             assignment = {
@@ -158,7 +176,7 @@ def build_demo(mock: bool = False):
                 seed=int(seed_val) if seed_val not in (None, "") else None,
             )
             out_path = paths.outputs_dir / timestamped_name("podcast")
-            engine = get_or_create_engine(cfg, mock=mock)
+            engine = get_or_create_engine(cfg, mock=bool(mock_on))
             try:
                 progress(0.1, desc="Preparing…")
                 result = generate(
@@ -184,7 +202,7 @@ def build_demo(mock: bool = False):
 
         generate_btn.click(
             on_generate,
-            inputs=[script, *speaker_dropdowns, device_dd, cfg_scale, seed],
+            inputs=[script, *speaker_dropdowns, device_dd, cfg_scale, seed, mock_toggle],
             outputs=[audio_out, file_out, status],
         )
 

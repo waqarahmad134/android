@@ -95,11 +95,11 @@ def describe_runtime(cfg: GenerationConfig, mock: bool = False) -> RuntimeInfo:
     """Resolve and summarise the runtime for display in the UI/CLI banner."""
     if mock:
         return RuntimeInfo(
-            device="cpu",
-            dtype="float32",
+            device="system",
+            dtype="n/a",
             attn_implementation="n/a",
             mock=True,
-            notes=["Mock engine active — no model weights required."],
+            notes=["Preview mode — offline system voice, no model weights required."],
         )
 
     device = detect_device(cfg.device)

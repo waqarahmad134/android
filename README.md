@@ -34,15 +34,19 @@ huggingface-cli download vibevoice/VibeVoice-1.5B
 python scripts/make_demo_voices.py
 ```
 
-> **Mock mode = a beep, not speech.** `VIBEVOICE_MOCK=1 python app.py` (or
-> `python app.py --mock`) launches the full UI with a mock engine that outputs a
-> **placeholder tone** — useful to verify the workflow before downloading the
-> weights. For **real voices**, install the model (steps 3–4), make sure mock is
-> off (`unset VIBEVOICE_MOCK`), and run `python app.py` with **no** `--mock`. The
-> banner at the top of the UI shows `mock: True/False`.
+> **Two quality tiers:**
+> - **Preview mode** (`VIBEVOICE_MOCK=1 python app.py` or `--mock`, or the
+>   checkbox in the UI) **actually speaks your script** using your computer's
+>   built-in offline voice via `pyttsx3` — instant, no model download, but a
+>   generic voice (no cloning). Great for drafting. On Linux it needs the system
+>   `espeak-ng` package; macOS/Windows work out of the box. If no system voice is
+>   found it falls back to a placeholder tone.
+> - **Full mode** (install the model in steps 3–4, then `python app.py` with the
+>   Preview checkbox **off**) uses VibeVoice-1.5B for high-quality, **voice-cloned**
+>   speech. The banner at the top shows the current mode.
 >
 > The placeholder voices from step 5 are synthetic tones — **replace them with
-> real 10–30s speech samples** in `assets/voices/` for actual generation.
+> real 10–30s speech samples** in `assets/voices/` for cloned generation.
 
 ---
 
@@ -57,6 +61,12 @@ python app.py --mock          # no weights needed (placeholder audio)
 In the UI: paste/load a script → assign a voice to each speaker → (optionally)
 upload or record a sample under **Clone a voice** → **Generate** → play and
 download the WAV.
+
+**Preview vs full, live:** under *Advanced settings* there's a **Preview mode**
+checkbox. Tick it to hear your script instantly in your system's offline voice
+(no weights, no cloning); untick it to use the real VibeVoice model with voice
+cloning — no restart needed. The banner at the top updates to show the current
+mode and warns if the model isn't installed.
 
 ## Usage — CLI
 

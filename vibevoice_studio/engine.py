@@ -200,14 +200,116 @@ class MockEngine(GenerationEngine):
         return audio, SAMPLE_RATE
 
 
+def _render_with_pyttsx3(engine_text: str):
+    """Speak the script with the OS's built-in offline voice via pyttsx3.
+
+    Returns a 1-D float32 numpy waveform at ``SAMPLE_RATE``, or ``None`` if
+    pyttsx3 / a system speech engine is unavailable. Each speaker gets a
+    different system voice when more than one is installed, and the ``Speaker N:``
+    labels are stripped so they are not read aloud.
+    """
+    try:
+        import tempfile  # noqa: PLC0415
+
+        import numpy as np  # noqa: PLC0415
+        import pyttsx3  # noqa: PLC0415
+
+        from .script_parser import parse_script  # noqa: PLC0415
+        from .utils import load_and_normalize_audio  # noqa: PLC0415
+    except Exception:
+        return None
+
+    try:
+        engine = pyttsx3.init()
+    except Exception:
+        return None
+
+    voices = []
+    try:
+        voices = engine.getProperty("voices") or []
+    except Exception:
+        voices = []
+
+    parsed = parse_script(engine_text)
+    segments = []
+    gap = np.zeros(int(0.25 * SAMPLE_RATE), dtype="float32")  # pause between turns
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            for idx, line in enumerate(parsed.lines):
+                if not line.text:
+                    continue
+                if voices:
+                    voice = voices[(line.speaker_index - 1) % len(voices)]
+                    try:
+                        engine.setProperty("voice", voice.id)
+                    except Exception:
+                        pass
+                wav_path = os.path.join(tmp, f"seg_{idx}.wav")
+                engine.save_to_file(line.text, wav_path)
+                engine.runAndWait()
+                if not os.path.exists(wav_path) or os.path.getsize(wav_path) == 0:
+                    return None
+                seg = load_and_normalize_audio(wav_path, target_sr=SAMPLE_RATE)
+                segments.append(np.asarray(seg, dtype="float32"))
+                segments.append(gap)
+    except Exception:
+        return None
+
+    if not segments:
+        return None
+    return np.concatenate(segments).astype("float32")
+
+
+class PreviewEngine(GenerationEngine):
+    """Fast, offline preview using the operating system's built-in voice.
+
+    Unlike the real :class:`VibeVoiceEngine`, this does **not** clone your voice
+    samples — it just speaks the actual words of the script with a generic system
+    voice. It needs no model weights and is instant, which makes it ideal for
+    drafting a script before committing to a full VibeVoice render. If no system
+    speech engine is available it falls back to :class:`MockEngine`'s tone.
+    """
+
+    _loaded = False
+
+    @property
+    def is_loaded(self) -> bool:
+        return self._loaded
+
+    def load(self) -> None:
+        self._loaded = True
+
+    def synthesize(self, engine_text, voice_sample_paths, cfg):
+        self.load()
+        audio = _render_with_pyttsx3(engine_text)
+        if audio is not None and len(audio) > 0:
+            return audio, SAMPLE_RATE
+        logger.warning(
+            "No system speech engine available (install pyttsx3 + an OS voice); "
+            "falling back to a placeholder tone."
+        )
+        return MockEngine(self.cfg).synthesize(engine_text, voice_sample_paths, cfg)
+
+
 def force_mock_env() -> bool:
     """True when the ``VIBEVOICE_MOCK`` env var requests the mock engine."""
     return os.environ.get(MOCK_ENV_VAR, "").strip().lower() in {"1", "true", "yes"}
 
 
+def model_available() -> bool:
+    """True if torch and the vibevoice package are importable (real mode possible)."""
+    import importlib.util  # noqa: PLC0415
+
+    return all(
+        importlib.util.find_spec(name) is not None
+        for name in ("torch", "vibevoice")
+    )
+
+
 def make_engine(cfg: GenerationConfig, mock: bool = False) -> GenerationEngine:
-    """Return a :class:`MockEngine` when requested/forced, else the real engine."""
+    """Return a :class:`PreviewEngine` when mock/preview is requested, else real."""
     if mock or force_mock_env():
-        logger.info("Using MockEngine (no model weights required).")
-        return MockEngine(cfg)
+        logger.info("Using PreviewEngine (offline system voice, no model weights).")
+        return PreviewEngine(cfg)
     return VibeVoiceEngine(cfg)
